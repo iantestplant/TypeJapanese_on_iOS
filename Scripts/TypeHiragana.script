@@ -1,10 +1,12 @@
-﻿params charsToType, requiredWord
+﻿params hiraganaToType, requiredKanji
 
 // Helper script for hiragana to Kanji.
-// Call this script by passing haragana character in the first Parameter and the required Kanji in the second parameter e.h.
-// TypeHiragana "なす",  "茄子"
-// The Kanji is selected from the Candidates list using OCR.
-// If the required Kanji is not in the first list of candidates so is not displayed, then selecting once manually will cause it to be displayed first the next time the same hiragana is entered.
+
+// Set logging to minimal unless debugging
+if debugTyping is not true
+	set sl to the scriptlogging
+	set the scriptlogging to minimal
+end if
 
 set ScreenSize = RemoteScreenSize()
 
@@ -14,53 +16,46 @@ global cell_h
 global KP_x // KeyPad X
 global KP_y // KeyPad Y
 
-if ScreenSize.x > ScreenSize.y
-	set landscape = false
-else
-	set landscape = true
-end if
+set devType = "iPhone" // default device type
+
+set multiRowCandidates = false // some iPhones in landscape have 4 rows of candidates
 
 // set values for each screen size
 if ScreenSize = (640,1136) // iPhone 5c portrait
-	set landscape = false
-
 	set cell_h = 108
 	set cell_w =  ScreenSize.x div 5
 	set KP_x = cell_w
 	set KP_y = ScreenSize.y - (cell_h*4)
-
+	
 	set Candidate_TL = (0, KP_y - 65)
 	set Candidate_BR = (ScreenSize.x - cell_w + 50, KP_y - 2)
 	set Separator = "Separator_5P"
-
+	
 else if ScreenSize = (1136,640) // iPhone 5c landscape
-	set landscape = true
-
 	set cell_h = 82
 	set rowSize = cell_h
 	set cell_w =  ScreenSize.y div 5 // happens to be 128 on iPhone5
 	set KP_x = ScreenSize.x -  (cell_w * 4)
 	set KP_y = ScreenSize.y - (cell_h * 4)
-
+	
 	set Candidate_TL = (cell_w, KP_y)
 	set Candidate_BR = (512,   KP_y + cell_h)
-
+	
 	set Separator = "Separator_5L"
-
+	set multiRowCandidates = true
+	
 else if ScreenSize = (640, 1008) // iPhone 4 portrait
 	set ScreenSize = (640, 960) // set to actual size removing the eggOn control line
-	set landscape = false
 	set cell_w =  ScreenSize.x div 5
 	set cell_h = 108
 	set KP_x = cell_w
 	set KP_y = ScreenSize.y - (cell_h*4)
-
+	
 	set Candidate_TL = (0, KP_y - 65)
 	set Candidate_BR = (ScreenSize.x - cell_w + 50, KP_y - 2)
 	set Separator = "Separator_4"
-
+	
 else if ScreenSize = (960, 688) // iPhone 4 landscape
-	set landscape = false // for iOS 4, landscape works the same as portrait
 	set ScreenSize = (960, 640) // set to actual size removing the eggOn control line
 	set cell_w =  ScreenSize.x div 5
 	set cell_h = 82
@@ -68,80 +63,116 @@ else if ScreenSize = (960, 688) // iPhone 4 landscape
 	set KP_y = ScreenSize.y - (cell_h*4)
 	set Candidate_TL = (0, 246)
 	set Candidate_BR = (ScreenSize.x, KP_y - 2)
-
 	set Separator = "Separator_4"
-
+	
 else if ScreenSize = (750, 1334) // iPhone 6 portrait
-	set landscape = false
+	
 else if ScreenSize = (1242, 2208) // iPhone 6+ portrait
-	set landscape = false
 	set cell_w =  ScreenSize.x div 5
 	set cell_h = 168
 	set KP_x = cell_w
 	set KP_y = ScreenSize.y - (cell_h*4)
-
+	
 	set Candidate_TL = (0, KP_y - 100) // 100=candidate height
 	set Candidate_BR = (ScreenSize.x - cell_w + 50, KP_y - 2)
 	set Separator = "Separator_6P"
 else if ScreenSize = (2208, 1242) // iPhone 6+ landscape
-	set landscape = true
-
+	set multiRowCandidates = true
+	
+else if ScreenSize = (2048,1536) // iPad landscape
+	set devType = "iPad"
+	set cell_w =  149
+	set cell_h = 140
+	set KP_x = 200
+	set KP_y = ScreenSize.y - (cell_h * 5)
+	
+	set Candidate_TL = (0, KP_y - 100) // 100=candidate height
+	set Candidate_BR = (ScreenSize.x - cell_w + 50, KP_y - 2)
+	set Separator = "Separator_6P"
+else if ScreenSize = (1536, 2048) // iPad portrait
+	set devType = "iPad"
+	set cell_w =  112
+	set cell_h = 105
+	set KP_x = 150
+	set KP_y = ScreenSize.y - (cell_h * 5)
+	
+	set Candidate_TL = (0, KP_y - 100) // 100=candidate height
+	set Candidate_BR = (ScreenSize.x - cell_w, KP_y - 2)
+	set Separator = "Separator_6P"
 else
 	logerror "screen size " && ScreenSize && "not handled"
 	exit handler
 end if
 
 set charWidth = 33 // minimum character width in the candidates
-set Space_pos = (ScreenSize.x - (cell_w div 2), ScreenSize.y - (2.5*cell_h))
-set Select_pos = (ScreenSize.x - (cell_w div 2), ScreenSize.y - cell_h)
+set Space_pos = (ScreenSize.x - (cell_w div 2), KP_y + (1.5*cell_h))
+set Select_pos = (ScreenSize.x - (cell_w div 2), KP_y + (2.5*cell_h))
 
-// values for swipe actions when selecting alternate characters on the keypad
+// values for swipe actions when selecting alternate characters on the keypad 
 set move = cell_h
 set left_m = (-(move), 0)
 set up_m = (0, -(move))
 set right_m = ((move), 0)
 set down_m = (0, (move))
 
-// Property list for each hiragana character on the 3x4 keyboard and any swipe actions to find alternate chars
-set charlocations = {
-	あ:(1,0), い:(1,left_m),	 う:(1,up_m), え:(1,right_m),      お:(1,down_m), // 1
-	か:(2,0), き:(2,left_m),	く:(2,up_m),	け:(2,right_m),	こ:(2,down_m), // 2
-	さ:(3,0), し:(3,left_m),	す:(3,up_m), せ:(3,right_m),	そ:(3,down_m), //3
-	た:(4,0), ち:(3,left_m),	つ:(4,up_m),	て:(4,right_m),	と:(4,down_m), // 4
-	な:(5,0), に:(5,left_m),	ぬ:(5,up_m),	ね:(5,right_m),	の:(5,down_m), // 5
-	は:(6,0), ひ:(6,left_m),	ふ:(6,up_m),	へ:(6,right_m),	ほ:(6,down_m), // 6
-	ま:(7,0), み:(7,left_m),	む:(7,up_m),	め:(7,right_m),	も:(7,down_m), // 7
-	や:(8,0), "「":(8,left_m),	ゆ:(8,up_m),	"」":(8,right_m),	よ:(8,down_m), // 8
-	ら:(9,0),り:(9,left_m),	 る:(9,up_m),	れ:(9,right_m),	ろ:(9,down_m), // 9
-	わ:(11,0), を:(11,left_m),	ん:(11,up_m),	ー:(11,right_m), // 0
-	"、":(12, 0), "。":(12, left_m),	"？":(12, up_m),	"！":(12, right_m)
-}
 
-set hiragana = charlocations.keys
-
-repeat with c = each character of charsToType
-	if hiragana contains c
-		set locn = charlocations.(c)
-		set posn = numKeyPosn(item 1 of locn)
-		if (item 2 of locn is 0)
-			tap posn
-		else
-			Press posn
-			Release posn + item 2 of locn
-		end if
-		if item 1 of locn is 12 // punctuation
+if devType is "iPhone"
+	
+	// Property list for each hiragana character on the 3x4 keyboard and swipe actions to find alternate chars
+	set charlocations = {
+		あ:(1,0), い:(1,left_m),	 う:(1,up_m), え:(1,right_m),      お:(1,down_m), // 1
+		か:(2,0), き:(2,left_m),	く:(2,up_m),	け:(2,right_m),	こ:(2,down_m), // 2
+		さ:(3,0), し:(3,left_m),	す:(3,up_m), せ:(3,right_m),	そ:(3,down_m), //3
+		た:(4,0), ち:(3,left_m),	つ:(4,up_m),	て:(4,right_m),	と:(4,down_m), // 4
+		な:(5,0), に:(5,left_m),	ぬ:(5,up_m),	ね:(5,right_m),	の:(5,down_m), // 5
+		は:(6,0), ひ:(6,left_m),	ふ:(6,up_m),	へ:(6,right_m),	ほ:(6,down_m), // 6
+		ま:(7,0), み:(7,left_m),	む:(7,up_m),	め:(7,right_m),	も:(7,down_m), // 7
+		や:(8,0), "「":(8,left_m), ゆ:(8,up_m),	"」":(8,right_m), よ:(8,down_m), // 8
+		ら:(9,0),り:(9,left_m),	 る:(9,up_m),	れ:(9,right_m),	ろ:(9,down_m), // 9
+		わ:(11,0), を:(11,left_m),	ん:(11,up_m),	ー:(11,right_m), // 0
+		"、":(12, 0), "。":(12, left_m),	"？":(12, up_m),	"！":(12, right_m) 
+	}
+	
+	set hiragana = charlocations.keys
+	
+	repeat with c = each character of hiraganaToType
+		if hiragana contains c
+			set locn = charlocations.(c)
+			set posn = numKeyPosn(item 1 of locn)
+			if (item 2 of locn is 0)
+				tap posn
+			else
+				Press posn
+				Release posn + item 2 of locn
+			end if		
+			if item 1 of locn is 12 // punctuation
+				tap Select_pos
+			end if
+			
+		else if c is " "
+			tap Space_pos
+		else if c is return
 			tap Select_pos
 		end if
+		
+	end repeat
+else if devType is "iPad"
+	// 「？！、。
+	set hiraganaKeys = "「わらやまはなたさかあ？をり みひにちしきい！んるゆむふぬつすくう、ーれ めへねてせけえ。_ろよもほのとそこお"
+	
+	repeat with c = each character of hiraganaToType
+		if c is " "
+			tap Space_pos
+		else if c is return
+			tap Select_pos
+		else
+			set posn = iPadnumKeyPosn(offset of c in hiraganaKeys)
+			tap posn
+		end if
+	end repeat
+End if
 
-	else if c is " "
-		tap Space_pos
-	else if c is return
-		tap Select_pos
-	end if
-
-end repeat
-
-if requiredWord is empty then exit handler
+if requiredKanji is empty then exit handler
 
 // OCR does not recognise spaces in Chinese languages so a text read of the kanji candidates results in an
 // unseparated list of characters. Hence get the wrong selection when requiredWord inside a prior word.
@@ -153,22 +184,25 @@ set BR = Candidate_BR
 set tl_x = TL.x
 set br_x = BR.x
 
-repeat 4 times // 4 rows of candidates in landscape
+if devType is "iPad" then wait 1.0 // time to display the candidates. ToDo check that it is not blank
+
+repeat 4 times // 4 rows of candidates if multiRowCandidates
 	repeat while ImageFound(0, Image:Separator, SearchRectangle:(TL,BR))
 		set right_edge = foundimageinfo().ImageRectangle.right
 		if foundimageinfo().ImageRectangle.left - TL.x > charWidth // check if room for a character
 			set SR = (TL.x-5, TL.y,foundimageinfo().ImageRectangle.left+5, BR.y) // add 5 to left and right edges to help OCR
 			set kanji = readtext(SR, Language:"Japanese")
-			if kanji equals requiredWord
+			if kanji equals requiredKanji
 				tap SR.center()
 				set found = true
 				exit handler
 			end if
 		end if
 		set TL = (right_edge, TL.y) // move left boundary for next time
-		if (BR.x - TL.x) < charWidth then exit repeat // not enough space left
+		if (BR.x - TL.x) < charWidth then exit repeat // not enough space left  
 	end repeat
-	if landscape
+	
+	if multiRowCandidates
 		// set top left and bottom right to next row
 		set TL = (tl_x, TL.y+rowSize)
 		set BR = (br_x, BR.y+rowSize)
@@ -177,17 +211,22 @@ repeat 4 times // 4 rows of candidates in landscape
 	end if
 end repeat
 
-if not found then
-	LogError requiredWord &&  "Not Found"
-	tap Select_pos // must press the select key
+if not found then 
+	LogError requiredKanji && "Not Found"
+	tap Select_pos // must press the select key 
 end if
 
 
-// from a 3x4 grid (the keypad) return the coordinates for cell numbers 1 to 12
+// from a 3x4 grid (iPhone keypad) return the coordinates for cell numbers 1 to 12 
 function numKeyPosn num
 	set X = global KP_x + (((num-1) mod 3)  * global cell_w) + (global cell_w/2)
 	set Y = global KP_y + (((num-1) div 3) * global cell_h) + (global cell_h/2)
 	return (X, Y)
 end numKeyPosn
 
-
+// from a 5x11 grid (iPad keypad) return the coordinates for cell numbers 1 to 66 
+function iPadnumKeyPosn num
+	set X = global KP_x + (((num-1) mod 11)  * global cell_w) + (global cell_w/2)
+	set Y = global KP_y + (((num-1) div 11) * global cell_h) + (global cell_h/2)
+	return (X, Y)
+end iPadnumKeyPosn
