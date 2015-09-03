@@ -6,10 +6,10 @@ TypeHiragana  "にほん", "日本人"
 
 TypeHiragana " "
 TypeHiragana "なす",  "茄子"  // nasu, eggplant
-TypeHiragana " "
-
-TypeHiragana "、。？！"
 TypeHiragana return
 
-TypeText "abcd   茄子"
-TypeText "ABá€ê¼"
+TypeHiragana "、。？！ " & return
+TypeHiragana return
+// 「？！、。
+
+
