@@ -21,30 +21,7 @@ set devType = "iPhone" // default device type
 set multiRowCandidates = false // some iPhones in landscape have 4 rows of candidates
 
 // set values for each screen size
-if ScreenSize = (640,1136) // iPhone 5c portrait
-	set cell_h = 108
-	set cell_w =  ScreenSize.x div 5
-	set KP_x = cell_w
-	set KP_y = ScreenSize.y - (cell_h*4)
-	
-	set Candidate_TL = (0, KP_y - 65)
-	set Candidate_BR = (ScreenSize.x - cell_w + 50, KP_y - 2)
-	set Separator = "Separator_5P"
-	
-else if ScreenSize = (1136,640) // iPhone 5c landscape
-	set cell_h = 82
-	set rowSize = cell_h
-	set cell_w =  ScreenSize.y div 5 // happens to be 128 on iPhone5
-	set KP_x = ScreenSize.x -  (cell_w * 4)
-	set KP_y = ScreenSize.y - (cell_h * 4)
-	
-	set Candidate_TL = (cell_w, KP_y)
-	set Candidate_BR = (512,   KP_y + cell_h)
-	
-	set Separator = "Separator_5L"
-	set multiRowCandidates = true
-	
-else if ScreenSize = (640, 1008) // iPhone 4 portrait
+if ScreenSize = (640, 1008) // iPhone 4 portrait
 	set ScreenSize = (640, 960) // set to actual size removing the eggOn control line
 	set cell_w =  ScreenSize.x div 5
 	set cell_h = 108
@@ -65,8 +42,47 @@ else if ScreenSize = (960, 688) // iPhone 4 landscape
 	set Candidate_BR = (ScreenSize.x, KP_y - 2)
 	set Separator = "Separator_4"
 	
-else if ScreenSize = (750, 1334) // iPhone 6 portrait
+else if ScreenSize = (640,1136) // iPhone 5c portrait
+	set cell_h = 108
+	set cell_w =  ScreenSize.x div 5
+	set KP_x = cell_w
+	set KP_y = ScreenSize.y - (cell_h*4)
 	
+	set Candidate_TL = (0, KP_y - 65)
+	set Candidate_BR = (ScreenSize.x - cell_w + 50, KP_y - 2)
+	set Separator = "Separator_5P"
+	
+else if ScreenSize = (1136,640) // iPhone 5c landscape
+	set cell_h = 82
+	set rowSize = cell_h
+	set cell_w =  ScreenSize.y div 5
+	set KP_x = ScreenSize.x -  (cell_w * 4)
+	set KP_y = ScreenSize.y - (cell_h * 4)
+	
+	set Candidate_TL = (cell_w, KP_y)
+	set Candidate_BR = (512,   KP_y + cell_h)
+	
+	set Separator = "Separator_5L"
+	set multiRowCandidates = true
+	
+else if ScreenSize = (750, 1334) // iPhone 6 portrait
+	set KP_y = 900
+	set cell_h = (ScreenSize.y - KP_y) / 4
+	set cell_w = ScreenSize.x div 5
+	set KP_x = cell_w
+	set Candidate_TL = (0, KP_y - 70)
+	set Candidate_BR = (ScreenSize.x - (cell_w / 2), KP_Y -2)
+	set Separator= "Separator_6"
+else if ScreenSize = (1334, 750) // iPhone 6 Landscape
+	set KP_y = 428
+	set KP_x = 742
+	set cell_h = (ScreenSize.y - KP_y) / 4
+	set rowSize = cell_h
+	set cell_w =  (ScreenSize.x - KP_x) / 4
+	set Candidate_TL = (cell_w, KP_y)
+	set Candidate_BR = (588,   ScreenSize.y - (3* cell_h))
+	set Separator = "Separator_5L"
+	set multiRowCandidates = true
 else if ScreenSize = (1242, 2208) // iPhone 6+ portrait
 	set cell_w =  ScreenSize.x div 5
 	set cell_h = 168
@@ -78,6 +94,7 @@ else if ScreenSize = (1242, 2208) // iPhone 6+ portrait
 	set Separator = "Separator_6P"
 else if ScreenSize = (2208, 1242) // iPhone 6+ landscape
 	set multiRowCandidates = true
+	LogWarning " iPhone 6+ landscape no yet completed"
 	
 else if ScreenSize = (2048,1536) // iPad landscape
 	set devType = "iPad"
@@ -216,6 +233,7 @@ if not found then
 	tap Select_pos // must press the select key 
 end if
 
+set the scriptlogging to silver
 
 // from a 3x4 grid (iPhone keypad) return the coordinates for cell numbers 1 to 12 
 function numKeyPosn num
